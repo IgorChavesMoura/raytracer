@@ -15,4 +15,4 @@
  - Metal 
  - Dielectric ([Dielectric Material](https://en.wikipedia.org/wiki/Dielectric))
 
-![Result](https://github.com/IgorChavesMoura/raytracer/blob/master/result.ppm)
+![Result](https://github.com/IgorChavesMoura/raytracer/blob/master/result.png?raw=true)
