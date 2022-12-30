@@ -7,7 +7,7 @@
 
 #include "Hittable.h"
 #include "Triangle.h"
-#include "util.h"
+#include "../util.h"
 
 class Mesh : public Hittable {
 
@@ -16,7 +16,7 @@ class Mesh : public Hittable {
         Mesh() { }
         Mesh(std::shared_ptr<Material> m) : material(m) {}
 
-        virtual bool hit(const Ray& r, double t_min, double t_max, hit_record& rec) const;
+        virtual bool hit(const Ray& r, double tMin, double tMax, HitRecord& rec) const;
 
         void add_face(Vector3 v0, Vector3 v1, Vector3 v2){
 
@@ -36,7 +36,7 @@ class Mesh : public Hittable {
 
         }
 
-        void translate_to_pos(const Vector3& v){
+        void translateToPos(const Vector3& v){
 
             for(std::shared_ptr<Triangle> f : faces){
 
@@ -79,11 +79,11 @@ class Mesh : public Hittable {
 
 };
 
-bool Mesh::hit(const Ray& r, double t_min, double t_max, hit_record& rec) const {
+bool Mesh::hit(const Ray& r, double tMin, double tMax, HitRecord& rec) const {
 
     Vector3 normal;
 
-    double t_hit = infinity;
+    double tHit = infinity;
 
     bool hit = false;
 
@@ -91,11 +91,11 @@ bool Mesh::hit(const Ray& r, double t_min, double t_max, hit_record& rec) const 
     //Check if has hit on any face and get closest hit
     for(std::shared_ptr<Triangle> f : faces){
 
-        if(f->hit(r, t_min, t_max, rec)){
+        if(f->hit(r, tMin, tMax, rec)){
 
-            if(rec.t < t_hit){
+            if(rec.t < tHit){
 
-                t_hit = rec.t;
+                tHit = rec.t;
                 normal = rec.normal;
 
             }
@@ -106,9 +106,9 @@ bool Mesh::hit(const Ray& r, double t_min, double t_max, hit_record& rec) const 
 
     }
 
-    rec.t = t_hit;
+    rec.t = tHit;
     rec.normal = normal;
-    rec.p = r.at(t_hit);
+    rec.p = r.at(tHit);
 
     return hit;
 

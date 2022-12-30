@@ -5,9 +5,9 @@
 #ifndef RAYTRACER_FILEPARSER_H
 #define RAYTRACER_FILEPARSER_H
 
-#include "Mesh.h"
-#include "Material.h"
-#include "Lambertian.h"
+#include "hittable/Mesh.h"
+#include "material/Material.h"
+#include "material/Lambertian.h"
 #include "util.h"
 
 class FileParser {
@@ -41,7 +41,7 @@ Vector3 FileParser::parseVector3FromFacet(char* facet){
 
 std::shared_ptr<Mesh> FileParser::parseStlFile(std::string file_path) {
 
-    auto albedo = color::random() * color::random();
+    auto albedo = Color::random() * Color::random();
 
     std::shared_ptr<Material> mat = std::make_shared<Lambertian>(albedo);
 

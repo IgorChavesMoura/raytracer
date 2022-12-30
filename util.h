@@ -11,6 +11,11 @@
 #include <memory>
 #include <vector>
 #include <fstream>
+// Include threading headers
+#include <thread>
+#include <mutex>
+//Measure time
+#include <chrono>
 
 
 //Constants
@@ -18,25 +23,32 @@ const double infinity = std::numeric_limits<double>::infinity();
 const double pi = 3.1415926535897932385;
 
 //Utility Functions
-inline double degrees_to_radians(double degrees){
+inline double degreesToRadians(double degrees){
 
     return degrees * pi/180.0;
 
 }
 
-inline double random_double(){
+inline double randomDouble(){
 
     //Returns a random real in [0,1)
     return rand()/ (RAND_MAX + 1.0);
 
 }
 
-inline double random_double(double min, double max){
+inline double randomDouble(double min, double max){
 
     //Returns a random real in [min,max)
-    return min + (max-min)*random_double();
+    return min + (max-min) * randomDouble();
 
 }
+
+inline int randomInt(int min, int max) {
+    // Returns a random integer in [min,max].
+    return static_cast<int>(randomDouble(min, max + 1));
+}
+
+inline int intmax(int a, int b) { return a > b ? a : b; }
 
 inline double clamp(double x, double min, double max){
 

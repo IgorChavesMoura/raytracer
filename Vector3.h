@@ -16,13 +16,13 @@ class Vector3 {
 
         inline static Vector3 random(){
 
-            return Vector3(random_double(), random_double(), random_double());
+            return Vector3(randomDouble(), randomDouble(), randomDouble());
 
         }
 
         inline static  Vector3 random(double t_min, double t_max){
 
-            return Vector3(random_double(t_min, t_max), random_double(t_min, t_max), random_double(t_min, t_max));
+            return Vector3(randomDouble(t_min, t_max), randomDouble(t_min, t_max), randomDouble(t_min, t_max));
 
         }
 
@@ -185,7 +185,7 @@ inline Vector3 cross(const Vector3& u, const Vector3& v){
 
 }
 
-inline Vector3 unit_vector(Vector3 v){
+inline Vector3 unitVector(Vector3 v){
 
     return v / v.length();
 
@@ -217,7 +217,7 @@ void Vector3::rotate(const Vector3 &axis, double angle) {
 
 }
 
-Vector3 random_in_unit_sphere() {
+Vector3 randomInUnitSphere() {
 
     while(true) {
 
@@ -235,19 +235,19 @@ Vector3 random_in_unit_sphere() {
 
 }
 
-Vector3 random_unit_vector() {
+Vector3 randomUnitVector() {
 
-    auto a = random_double(0, 2*pi);
-    auto z = random_double(-1, 1);
+    auto a = randomDouble(0, 2 * pi);
+    auto z = randomDouble(-1, 1);
     auto r = std::sqrt(1 - z*z);
 
     return Vector3(r * std::cos(a), r * std::sin(a), z);
 
 }
 
-Vector3 random_in_hemisphere(const Vector3& normal){
+Vector3 randomInHemisphere(const Vector3& normal){
 
-    Vector3 in_unit_sphere = random_in_unit_sphere();
+    Vector3 in_unit_sphere = randomInUnitSphere();
 
     if(dot(in_unit_sphere,normal) > 0.0){
 
@@ -261,11 +261,11 @@ Vector3 random_in_hemisphere(const Vector3& normal){
 
 }
 
-Vector3 random_in_unit_disk(){
+Vector3 randomInUnitDisk(){
 
     while(true){
 
-        auto p = Vector3(random_double(-1, 1), random_double(-1, 1), 0);
+        auto p = Vector3(randomDouble(-1, 1), randomDouble(-1, 1), 0);
 
         if(p.length_squared() >= 1){
 
@@ -285,11 +285,11 @@ Vector3 reflect(const Vector3& v, const Vector3& n){
 
 }
 
-Vector3 refract(const Vector3& uv, const Vector3& n, double etai_over_etat){
+Vector3 refract(const Vector3& uv, const Vector3& n, double etaiOverEtat){
 
     auto cos_theta = dot(-uv, n);
 
-    Vector3 r_out_perp = etai_over_etat * (uv + cos_theta * n);
+    Vector3 r_out_perp = etaiOverEtat * (uv + cos_theta * n);
     Vector3 r_out_parallel = -std::sqrt(std::fabs(1.0 - r_out_perp.length_squared())) * n;
 
     return  r_out_perp + r_out_parallel;
@@ -297,7 +297,7 @@ Vector3 refract(const Vector3& uv, const Vector3& n, double etai_over_etat){
 
 }
 
-using point3 = Vector3;
-using color = Vector3;
+using Point3 = Vector3;
+using Color = Vector3;
 
 #endif //RAYTRACER_VECTOR3_H

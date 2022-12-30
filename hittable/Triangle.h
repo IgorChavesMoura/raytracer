@@ -6,7 +6,7 @@
 #define RAYTRACER_TRIANGLE_H
 
 #include "Hittable.h"
-#include "Vector3.h"
+#include "../Vector3.h"
 
 
 class Triangle : public Hittable {
@@ -20,7 +20,7 @@ class Triangle : public Hittable {
         }
 
 
-        virtual bool hit(const Ray& r, double t_min, double t_max, hit_record& rec) const override;
+        virtual bool hit(const Ray& r, double t_min, double t_max, HitRecord& rec) const override;
 
 
     public:
@@ -33,7 +33,7 @@ class Triangle : public Hittable {
 
 };
 
-bool Triangle::hit(const Ray& r, double t_min, double t_max, hit_record& rec) const {
+bool Triangle::hit(const Ray& r, double t_min, double t_max, HitRecord& rec) const {
 
     double theta, t, u, v;
 
@@ -86,7 +86,7 @@ bool Triangle::hit(const Ray& r, double t_min, double t_max, hit_record& rec) co
 
     rec.t = t;
     rec.normal = normal;
-    rec.mat_ptr = material;
+    rec.matPtr = material;
 
     return true;
 

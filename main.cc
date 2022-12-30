@@ -2,125 +2,102 @@
 
 #include "util.h"
 #include "color.h"
-#include "FileParser.h"
-#include "HittableList.h"
-#include "Sphere.h"
-#include "Triangle.h"
-#include "Mesh.h"
+#include "world.h"
+#include "image.h"
+#include "hittable/HittableList.h"
+#include "BVHNode.h"
+#include "hittable/MovingSphere.h"
 #include "Camera.h"
-#include "Material.h"
-#include "Lambertian.h"
-#include "Metal.h"
-#include "Dielectric.h"
 
-color ray_color(const Ray& r, const Hittable& world, int depth){
+#define MT 1
 
-    hit_record rec;
+Color rayColor(const Ray& r, const Color& background, const Hittable& world, int depth){
+
+    HitRecord rec;
 
     if(depth <= 0){
 
-        return color(0,0,0);
+        return Color(0, 0, 0);
 
     }
 
-    if(world.hit(r,0.001,infinity,rec)) {
+    if(!world.hit(r,0.001,infinity,rec)) return Color(0, 0, 0);
 
-        Ray scattered;
-        color attenuation;
+    Ray scattered;
+    Color attenuation;
+    Color emitted = rec.matPtr->emitted(rec.u, rec.v, rec.p);
 
-        if(rec.mat_ptr->scatter(r,rec,attenuation,scattered)){
+    if(!rec.matPtr->scatter(r, rec, attenuation, scattered)){
 
-            return attenuation * ray_color(scattered,world,depth - 1);
-
-        }
-
-        return color(0,0,0);
+        return emitted;
 
     }
 
+    return emitted +
+           attenuation * rayColor(scattered, background, world, depth - 1);
 
-    Vector3 unit_direction = unit_vector(r.direction());
-
-    auto t = 0.5*(unit_direction.y() + 1.0);
-
-    return (1.0 - t)*color(1.0,1.0,1.0) + t*color(0.5,0.7,1.0);
 
 }
 
-int main(int argc, char** argv){
+void rayTrace(std::shared_ptr<int> nextTileX,
+              std::shared_ptr<int> nextTileY,
+              int tileWidth,
+              int tileHeight,
+              std::shared_ptr<std::mutex> tileInfoMutex,
+              const int imageWidth,
+              const int imageHeight,
+              const int samplesPerPixel,
+              const int maxDepth,
+              const Color& background,
+              const Camera& cam,
+              const Hittable& world,
+              std::shared_ptr<image::ImageData> imageData) {
 
-    //Image
-    const auto ASPECT_RATIO = (3.0/2.0);
-    const int IMAGE_WIDTH =  1200;
-    const int IMAGE_HEIGHT = static_cast<int>(IMAGE_WIDTH / ASPECT_RATIO);
-    const int SAMPLES_PER_PIXEL = 500;
-    const int MAX_DEPTH = 50;
+    // Run until all tiles have been processed
+    while(true) {
 
-    //World
-    HittableList world;
+        // Use mutex to access shared information about next tile to render
+        tileInfoMutex->lock();
 
-    auto material_ground = std::make_shared<Lambertian>(color(0.5, 0.5, 0.5));;
+        // Get next tile screen position from shared variables
+        int tileX = *nextTileX;
+        int tileY = *nextTileY;
 
+        // Advance to the next tile
+        *nextTileX += tileWidth;
 
-    world.add(std::make_shared<Sphere>(point3(0, -1000.5, -1), 1000, material_ground));
+        // Reached end of width
+        if(*nextTileX >= imageWidth) {
 
+            // Advance to the next line
+            *nextTileX = 0;
+            *nextTileY += tileHeight;
+        }
 
+        tileInfoMutex->unlock();
 
-    auto albedo = color::random() * color::random();
+        // Terminate when go beyond image borders
+        if(tileY >= imageHeight) return;
 
-    std::shared_ptr<Material> mat = std::make_shared<Lambertian>(albedo);
+        // Clip tile to image borders
+        tileWidth = tileWidth - intmax(0, tileX + tileWidth - imageWidth);
+        tileHeight = tileHeight - intmax(0, tileY + tileHeight - imageHeight);
 
-    std::shared_ptr<Mesh> ps5 = FileParser::parseStlFile("/home/igor/Downloads/Rack.stl");
+        for(int j = tileY; j < tileY + tileHeight; j++){
+            for(int i = tileX; i < tileX + tileWidth; i++){
+                Color pixel_color(0, 0, 0);
 
-    ps5->translate(Vector3(100, -160, 0));
+                for(int s = 0; s < samplesPerPixel; s++){
+                    auto u = (i + randomDouble()) / (imageWidth - 1);
+                    auto v = (j + randomDouble()) / (imageHeight - 1);
 
-    world.add(ps5);
-
-//    std::shared_ptr<Mesh> cube = std::make_shared<Mesh>(mat);
-//
-//    cube->add_face(Vector3(-0.5, 1, -1), Vector3(-0.5, 0, -1), Vector3(0.5, 0, -1));
-//    cube->add_face(Vector3(-0.5, 1, -1), Vector3(0.5, 0, -1), Vector3(0.5, 1, -1));
-//
-//    world.add(cube);
-
-    //std::shared_ptr<Material> triangle_material = std::make_shared<Lambertian>(albedo);
-//    world.add(std::make_shared<Triangle>(Vector3(-0.5,1,-1), Vector3(-0.5,0,-1), Vector3(0.5, 0, -1), mat));
-//    world.add(std::make_shared<Triangle>(Vector3(-0.5,1,-1), Vector3(0.5,0,-1), Vector3(0.5,1,-1), mat));
-
-    for(int a = -11; a < 11; a++){
-
-        for(int b = -11; b < 11; b++){
-
-            auto choose_mat = random_double();
-            point3 center(a + 0.9*random_double(), 0.2, b + 0.9*random_double());
-
-            if((center - point3(4, 0.2, 0)).length() > 0.9){
-
-                std::shared_ptr<Material> sphere_material;
-
-                if(choose_mat < 0.8){
-
-                    auto albedo = color::random() * color::random();
-
-                    sphere_material = std::make_shared<Lambertian>(albedo);
-
-                    world.add(std::make_shared<Sphere>(center, 0.2, sphere_material));
-
-                } else if(choose_mat < 0.95){
-
-                    auto albedo = color::random(0.5, 1);
-                    auto fuzz = random_double(0, 0.5);
-
-                    sphere_material = std::make_shared<Metal>(albedo, fuzz);
-                    world.add(std::make_shared<Sphere>(center, 0.2, sphere_material));
-
-                } else {
-
-                    sphere_material = std::make_shared<Dielectric>(1.5);
-
-                    world.add(std::make_shared<Sphere>(center, 0.2, sphere_material));
+                    Ray r = cam.getRay(u, v);
+                    pixel_color += rayColor(r, background, world, maxDepth);
 
                 }
+
+                int byteIndex = (i + ((imageHeight - 1) - j) * imageWidth) * 3;
+                writeColorToBuffer(imageData->data, byteIndex, pixel_color, samplesPerPixel);
 
             }
 
@@ -129,24 +106,103 @@ int main(int argc, char** argv){
 
     }
 
+}
+
+int main(int argc, char** argv){
+
+    //Image
+    const auto ASPECT_RATIO = 1.0;
+    const int IMAGE_WIDTH =  400;
+    const int IMAGE_HEIGHT = static_cast<int>(IMAGE_WIDTH / ASPECT_RATIO);
+    const int SAMPLES_PER_PIXEL = 200;
+    const int MAX_DEPTH = 50;
+
+    //World
+    HittableList world;
+
+    Color background(0, 0, 0);
+
     //Camera
-    point3 lookfrom(13,2,3);
-    point3 lookat(0,0,0);
-    Vector3 vup(0, 1, 0);
+    Point3 lookfrom;
+    Point3 lookat;
+    Vector3 vup;
 
-    auto dist_to_focus = (lookfrom - lookat).length();
-    auto aperture = 0.1;
+    double dist_to_focus;
+    double aperture;
 
-    Camera cam(lookfrom, lookat, vup, 20, ASPECT_RATIO, aperture, dist_to_focus);
+    worlds::final(world,lookfrom,lookat,vup,dist_to_focus,aperture);
+    background = Color(0, 0, 0);
+
+    Camera cam(lookfrom, lookat, vup, 40.0, ASPECT_RATIO, aperture, dist_to_focus, 0.0, 1.0);
+
+    BVHNode worldBVHTree = BVHNode(world, 0.0, 1.0);
+
+    std::shared_ptr<image::ImageData> imageData = std::make_shared<image::ImageData>();
+    imageData->width = IMAGE_WIDTH;
+    imageData->height = IMAGE_HEIGHT;
+    imageData->componentsPerPixel = BYTES_PER_PIXEL;
+    imageData->data = new uint8_t[IMAGE_WIDTH*IMAGE_HEIGHT*BYTES_PER_PIXEL];
 
     //Render
-    std::cout << "P3\n" << IMAGE_WIDTH << ' ' << IMAGE_HEIGHT << "\n255\n";
+    // std::cout << "P3\n" << IMAGE_WIDTH << ' ' << IMAGE_HEIGHT << "\n255\n";
+
+#if MT
+    const int TILE_WIDTH = 32;
+    const int TILE_HEIGHT = 32;
+
+    std::shared_ptr<int> nextTileX = std::make_shared<int>(0);
+    std::shared_ptr<int> nextTileY = std::make_shared<int>(0);
+    const unsigned int threadsNum = intmax(1, std::thread::hardware_concurrency());
+
+    std::cout << "Number of threads available: " << threadsNum << std::endl;
+
+    std::thread* threads = new std::thread[threadsNum];
+
+    std::cout << "Using " << threadsNum << " threads and " << TILE_WIDTH << "x" << TILE_HEIGHT << " tiles" << std::endl;
+
+    std::shared_ptr<std::mutex> tileInfoMutex = std::make_shared<std::mutex>();
+
+    // Start measuring time
+    std::chrono::high_resolution_clock::time_point tStart = std::chrono::high_resolution_clock::now();
+
+    // Spawn threads
+    for (unsigned int t = 0; t < threadsNum; t++) {
+        threads[t] = std::thread(rayTrace,
+                                 nextTileX,
+                                 nextTileY,
+                                 TILE_WIDTH,
+                                 TILE_HEIGHT,
+                                 tileInfoMutex,
+                                 IMAGE_WIDTH,
+                                 IMAGE_HEIGHT,
+                                 SAMPLES_PER_PIXEL,
+                                 MAX_DEPTH,
+                                 std::ref(background),
+                                 std::ref(cam),
+                                 std::ref(worldBVHTree),
+                                 imageData);
+    }
+
+    // Wait for threads to finish
+    for (unsigned int t = 0; t < threadsNum; t++) {
+        threads[t].join();
+    }
+
+    // Stop measuring time
+    std::chrono::high_resolution_clock::time_point tStop = std::chrono::high_resolution_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(tStop - tStart).count();
+
+    std::cout << "Raytracing using " << threadsNum << " threads and " << TILE_WIDTH << "x" << TILE_HEIGHT << " tiles took " << duration << " milliseconds." << std::endl;
+
+#else
+    int byteIndex = 0;
 
     for(int i = (IMAGE_HEIGHT - 1); i >= 0; i--){
-        std::cerr << "\rScanlines remaining: " << i << ' ' << std::endl << std::flush;
+        // std::cerr << "\rScanline: " << (i + 1) << " of " << IMAGE_HEIGHT << std::endl << std::flush;
         for(int j = 0; j < IMAGE_WIDTH; j++){ 
 
-            color pixel_color(0,0,0);
+            Color pixel_color(0,0,0);
 
             for(int s = 0; s < SAMPLES_PER_PIXEL; s++){
 
@@ -154,16 +210,22 @@ int main(int argc, char** argv){
                 auto v = (i + random_double()) / (IMAGE_HEIGHT - 1);
 
                 Ray r = cam.get_ray(u, v);
-                pixel_color += ray_color(r, world, MAX_DEPTH);
+                pixel_color += ray_color(r, background, worldBVHTree, MAX_DEPTH);
 
             }
 
-            write_color(std::cout, pixel_color, SAMPLES_PER_PIXEL);
+            write_color_to_buffer(imageData->data, byteIndex, pixel_color, SAMPLES_PER_PIXEL);
 
+            byteIndex += 3;
         }
+
 
     }
 
-    std::cerr << "\nDone.\n";
+#endif
+    image::writeBMP("result.bmp", *imageData);
+
+    delete[] imageData->data;
+    std::cout << "\nDone.\n";
 
 }
