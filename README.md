@@ -1,6 +1,8 @@
 # RayTracer
 
-## (Update 2022) Implemented the next book RayTracing The Next Week by Peter Shirley 
+## (Update 2022) Implemented the next book RayTracing The Next Week by Peter Shirley and created the accelerated GPU version
+
+![Result GPU](https://github.com/IgorChavesMoura/raytracer/blob/master/result-gpu.bmp?raw=true)
 
 [Ray Tracing The Next Week](https://raytracing.github.io/books/RayTheNextWeek.html)
 
@@ -8,7 +10,9 @@ Concepts implemented:
  - Spacetime Raytracing
  - Acceleration Structures (BVH Tree)
  - Multithread Raytracing
- - Texture mapping
+ - GPU Accelerated Raytracing
+ - Interative Raytracing
+ - Texture mapping on CPU and GPU
  - Lights
 
 New geometries:
@@ -31,4 +35,4 @@ New materials:
  - Metal 
  - Dielectric ([Dielectric Material](https://en.wikipedia.org/wiki/Dielectric))
 
-![Result](https://github.com/IgorChavesMoura/raytracer/blob/master/result.png?raw=true)
+![Result](https://github.com/IgorChavesMoura/raytracer/blob/master/result.bmp?raw=true)
