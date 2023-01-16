@@ -52,7 +52,7 @@ class CheckerTexture : public Texture {
 class ImageTexture : public Texture {
     public:
         ImageTexture() {}
-        ImageTexture(const char * filename) {
+        ImageTexture(const char* filename) {
             image::readImage(filename, imageData);
 
             bytesPerScanline = imageData.width * BYTES_PER_PIXEL;

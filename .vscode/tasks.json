@@ -9,14 +9,16 @@
           "args": ["-DCMAKE_BUILD_TYPE=Debug", ".."]  
        },
        {
-          "label": "make",  
-          "command":"make",  
+          "label": "build",  
+          "command":"make",
+          "dependsOn":[  
+             "cmake",
+          ],
        },
        {
           "label": "cmake build", 
           "dependsOn":[  
-             "cmake",
-             "make"
+             "build"
           ],
        }
     ],

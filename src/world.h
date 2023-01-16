@@ -155,13 +155,13 @@ namespace worlds {
         world.add(std::make_shared<XYRect>(0, 555, 0, 555, 555, white));
 
         std::shared_ptr<Hittable> box1 = std::make_shared<Box>(Point3(0, 0, 0), Point3(165, 330, 165), white);
-        box1 = std::make_shared<RotateY>(box1,15);
-        box1 = std::make_shared<Translate>(box1,Vector3(265,0,295));
+        (std::static_pointer_cast<Box>(box1))->rotate(15.0);
+        (std::static_pointer_cast<Box>(box1))->translate(Vector3(265,0,295));
         world.add(box1);
 
         std::shared_ptr<Hittable> box2 = std::make_shared<Box>(Point3(0,0,0), Point3(165,165,165), white);
-        box2 = std::make_shared<RotateY>(box2, -18);
-        box2 = std::make_shared<Translate>(box2, Vector3(130,0,65));
+        (std::static_pointer_cast<Box>(box2))->rotate(-18.0);
+        (std::static_pointer_cast<Box>(box2))->translate(Vector3(130,0,65));
         world.add(box2);
 
         lookFrom = Point3(278, 278, -800);
@@ -186,14 +186,16 @@ namespace worlds {
         world.add(std::make_shared<XYRect>(0, 555, 0, 555, 555, white));
 
         std::shared_ptr<Hittable> box1 = std::make_shared<Box>(Point3(0, 0, 0), Point3(165, 330, 165), white);
-        box1 = std::make_shared<RotateY>(box1,15);
-        box1 = std::make_shared<Translate>(box1,Vector3(265,0,295));
-        // world.add(box1);
+        (std::static_pointer_cast<Box>(box1))->rotate(15.0);
+        (std::static_pointer_cast<Box>(box1))->translate(Vector3(265,0,295));
+        world.add(box1);
 
-        auto earthTexture = std::make_shared<ImageTexture>("earthmap.jpg");
+        auto earthTexture = std::make_shared<ImageTexture>("assets/earthmap.jpg");
         auto earthSurface = std::make_shared<Lambertian>(earthTexture);
-        auto earth = std::make_shared<Sphere>(Point3(0, 0, 0), 400, earthSurface);
-        world.add(std::make_shared<Translate>(earth,Vector3(265,0,295)));
+        auto earth = std::make_shared<Sphere>(Point3(0, 0, 0), 100, earthSurface);
+        earth->translate(Vector3(400,130,100));
+        //earth->rotate(10.0);
+        world.add(earth);
 
         lookFrom = Point3(278, 278, -800);
         lookAt = Point3(278, 278, 0);

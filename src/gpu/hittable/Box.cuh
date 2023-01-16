@@ -1,69 +1,79 @@
-//
-// Created by moura on 27/12/2022.
-//
-
-#ifndef RAYTRACER_BOX_H
-#define RAYTRACER_BOX_H
-
-#include "Hittable.h"
-#include "HittableList.h"
-#include "Rect.h"
-#include "../AABB.h"
+#ifndef RAYTRACER_Box_cuh
+#define RAYTRACER_Box_cuh
+ 
+#include "Hittable.cuh"
+#include "HittableList.cuh"
+#include "Rect.cuh"
+#include "../util.cuh"
+#include "../AABB.cuh"
 
 class Box : public Hittable {
     public:
-        Box() {}
-        Box(const Point3& p0, const Point3& p1, std::shared_ptr<Material> ptr);
+        __device__ Box() {}
+        __device__ Box(const Point3& p0, const Point3& p1, Material* ptr);
+        __device__ ~Box() {
+            for(int i = 0; i < 6; i++) {
+                delete sides.objects[i];
+            }
 
-        virtual bool hit(const Ray& r, double tMin, double tMax, HitRecord& rec) const override;
+            delete[] sides.objects;
+        }
 
-        virtual bool boundingBox(double t0, double t1, AABB& outputBox) const override;
+        __device__ virtual bool hit(const Ray& r, float tMin, float tMax, HitRecord& rec, curandState* randState) const override;
 
-        void rotate(double angle);
-        void translate(Vector3 translation);
+        __device__ virtual bool boundingBox(float t0, float t1, AABB& outputBox) const override;
+
+        __device__ void translate(Vector3 translation);
+        __device__ void rotate(float angle);
 
     public:
         Point3 boxMin;
         Point3 boxMax;
         HittableList sides;
         Transform transform;
+
 };
 
-Box::Box(const Point3 &p0, const Point3 &p1, std::shared_ptr<Material> ptr) {
+
+__device__ Box::Box(const Point3& p0, const Point3& p1, Material* ptr) {
     boxMin = p0;
     boxMax = p1;
 
-    transform.translation.offset = Vector3(0.0, 0.0, 0.0);
+    transform.translation.offset = Vector3(0.0f, 0.0f, 0.0f);
 
-    transform.rotation.theta = 0.0;
-    transform.rotation.cosTheta = 1.0;
-    transform.rotation.sinTheta = 0.0;
+    transform.rotation.theta = 0.0f;
 
-    sides.add(std::make_shared<XYRect>(p0.x(), p1.x(), p0.y(), p1.y(), p1.z(), ptr));
-    sides.add(std::make_shared<XYRect>(p0.x(), p1.x(), p0.y(), p1.y(), p0.z(), ptr));
+    Hittable** sideList = (Hittable**)malloc(6*sizeof(Hittable*)); 
 
-    sides.add(std::make_shared<XZRect>(p0.x(), p1.x(), p0.z(), p1.z(), p1.y(), ptr));
-    sides.add(std::make_shared<XZRect>(p0.x(), p1.x(), p0.z(), p1.z(), p0.y(), ptr));
+    sideList[0] = new XYRect(boxMin.x(), boxMax.x(), boxMin.y(), boxMax.y(), boxMax.z(), ptr);
+    sideList[1] = new XYRect(boxMin.x(), boxMax.x(), boxMin.y(), boxMax.y(), boxMin.z(), ptr);
 
-    sides.add(std::make_shared<YZRect>(p0.y(), p1.y(), p0.z(), p1.z(), p1.x(), ptr));
-    sides.add(std::make_shared<YZRect>(p0.y(), p1.y(), p0.z(), p1.z(), p0.x(), ptr));
+    sideList[2] = new XZRect(boxMin.x(), boxMax.x(), boxMin.z(), boxMax.z(), boxMax.y(), ptr);
+    sideList[3] = new XZRect(boxMin.x(), boxMax.x(), boxMin.z(), boxMax.z(), boxMin.y(), ptr);
+
+    sideList[4] = new YZRect(boxMin.y(), boxMax.y(), boxMin.z(), boxMax.z(), boxMax.x(), ptr);
+    sideList[5] = new YZRect(boxMin.y(), boxMax.y(), boxMin.z(), boxMax.z(), boxMin.x(), ptr);
+
+    sides = HittableList(sideList, 6); 
+
 }
 
-void Box::rotate(double angle) {
+
+__device__ void Box::translate(Vector3 translation) {
+    transform.translation.offset = translation;
+}
+
+__device__ void Box::rotate(float angle) {
     transform.rotation.theta = degreesToRadians(angle);
     transform.rotation.sinTheta = sin(transform.rotation.theta);
     transform.rotation.cosTheta = cos(transform.rotation.theta);
 }
 
-void Box::translate(Vector3 translation) {
-    transform.translation.offset = translation;
-}
-
-bool Box::hit(const Ray &r, double tMin, double tMax, HitRecord &rec) const {
+__device__ bool Box::hit(const Ray &r, float tMin, float tMax, HitRecord &rec, curandState* randState) const {
     Ray movedRay(r.origin() - transform.translation.offset, r.direction(), r.time());
     
-    if(transform.rotation.theta == 0.0) {
-        bool hit = sides.hit(movedRay, tMin, tMax, rec);
+    if(transform.rotation.theta == 0.0f) {
+        bool hit = sides.hit(movedRay, tMin, tMax, rec, randState);
         
         if(hit) {
             rec.p += transform.translation.offset;
@@ -86,7 +96,7 @@ bool Box::hit(const Ray &r, double tMin, double tMax, HitRecord &rec) const {
 
     Ray rotatedR(origin,direction,movedRay.time());
 
-    if(!sides.hit(rotatedR,tMin,tMax,rec)) return false;
+    if(!sides.hit(rotatedR,tMin,tMax,rec,randState)) return false;
 
     auto p = rec.p;
     auto normal = rec.normal;
@@ -103,18 +113,18 @@ bool Box::hit(const Ray &r, double tMin, double tMax, HitRecord &rec) const {
     return true;
 }
 
-bool Box::boundingBox(double t0, double t1, AABB& outputBox) const {
+__device__ bool Box::boundingBox(float t0, float t1, AABB& outputBox) const {
     AABB bBox = AABB(boxMin, boxMax);
     
-    if(transform.rotation.theta == 0.0) {
+    if(transform.rotation.theta == 0.0f) {
         outputBox = AABB(bBox.min() + transform.translation.offset, bBox.max() + transform.translation.offset);
         return true;
     }
 
-    double cosTheta = transform.rotation.cosTheta;
-    double sinTheta = transform.rotation.sinTheta;
+    float cosTheta = transform.rotation.cosTheta;
+    float sinTheta = transform.rotation.sinTheta;
 
-    double infinity = INFINITY;
+    float infinity = INFINITY;
 
     Point3 min(infinity, infinity, infinity);
     Point3 max(-infinity, -infinity, -infinity);
@@ -147,4 +157,5 @@ bool Box::boundingBox(double t0, double t1, AABB& outputBox) const {
     return true;
 }
 
-#endif //RAYTRACER_BOX_H
+ 
+#endif // RAYTRACER_Box_cuh

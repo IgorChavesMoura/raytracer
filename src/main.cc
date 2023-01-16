@@ -82,7 +82,7 @@ void rayTrace(std::shared_ptr<int> nextTileX,
         tileHeight = tileHeight - intmax(0, tileY + tileHeight - imageHeight);
 
         for(int j = tileY; j < tileY + tileHeight; j++){
-            for(int i = tileX; i < tileX + tileWidth; i++){
+            for(int i = tileX + tileWidth - 1; i >= tileX; i--){
                 Color pixel_color(0, 0, 0);
 
                 for(int s = 0; s < samplesPerPixel; s++){
@@ -110,9 +110,9 @@ int main(int argc, char** argv){
 
     //Image
     const auto ASPECT_RATIO = 1.0;
-    const int IMAGE_WIDTH =  800;
+    const int IMAGE_WIDTH =  480;
     const int IMAGE_HEIGHT = static_cast<int>(IMAGE_WIDTH / ASPECT_RATIO);
-    const int SAMPLES_PER_PIXEL = 10000;
+    const int SAMPLES_PER_PIXEL = 300;
     const int MAX_DEPTH = 50;
 
     //World
@@ -128,7 +128,7 @@ int main(int argc, char** argv){
     double dist_to_focus;
     double aperture;
 
-    worlds::final(world,lookfrom,lookat,vup,dist_to_focus,aperture);
+    worlds::cornellBox(world,lookfrom,lookat,vup,dist_to_focus,aperture);
     background = Color(0, 0, 0);
 
     Camera cam(lookfrom, lookat, vup, 40.0, ASPECT_RATIO, aperture, dist_to_focus, 0.0, 1.0);
@@ -141,8 +141,6 @@ int main(int argc, char** argv){
     imageData->componentsPerPixel = BYTES_PER_PIXEL;
     imageData->data = new uint8_t[IMAGE_WIDTH*IMAGE_HEIGHT*BYTES_PER_PIXEL];
 
-    //Render
-    // std::cout << "P3\n" << IMAGE_WIDTH << ' ' << IMAGE_HEIGHT << "\n255\n";
 
 #if MT
     const int TILE_WIDTH = 32;

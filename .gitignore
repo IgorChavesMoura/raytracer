@@ -1,6 +1,6 @@
 cmake-build-debug/*
 CMakeFiles/*
 build/*
-src/gpu/*
+out/*
 .idea
-run-gpu.sh
+.vs

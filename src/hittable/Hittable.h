@@ -10,6 +10,20 @@
 
 class Material;
 
+struct RotationTransform {
+    double theta; //radians
+    double sinTheta,cosTheta;
+};
+
+struct TranslationTransform {
+    Vector3 offset;
+};
+
+struct Transform {
+    RotationTransform rotation;
+    TranslationTransform translation;
+};
+
 struct HitRecord {
 
     Point3 p;

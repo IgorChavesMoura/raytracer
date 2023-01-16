@@ -19,8 +19,6 @@
 #define PI 3.141592654f
 #define RANDVEC3 Vector3(curand_uniform(local_rand_state),curand_uniform(local_rand_state),curand_uniform(local_rand_state))
 
-//Constants
-const float infinity = FLT_MAX;
 
 //Utility Functions
 __device__ inline float degreesToRadians(float degrees){
@@ -67,13 +65,11 @@ __host__ __device__ inline float clamp(float x, float min, float max){
 
 }
 
-__device__ float* multiplyVectorByMatrix(float A[4][4], float v[4]){
-
-    float* u = new float[3];
+__device__ void multiplyVectorByMatrix(float A[4][4], float v[4], float u[4]){
 
     for(int i = 0; i < 4; i++){
 
-        u[i] = 0;
+        u[i] = 0.0f;
 
         for(int j = 0; j < 4; j++){
 
@@ -81,8 +77,6 @@ __device__ float* multiplyVectorByMatrix(float A[4][4], float v[4]){
 
         }
     }
-
-    return u;
 }
 
 __device__ Vector3 Vector3::random(curandState* randState){
@@ -99,8 +93,8 @@ __device__ Vector3 Vector3::random(curandState* randState, float tMin, float tMa
 
 __device__ void Vector3::rotate(const Vector3 &axis, float angle) {
 
-    float w = std::cos(angle/2);
-    float s = std::sin(angle/2);
+    float w = cos(angle/2);
+    float s = sin(angle/2);
 
     Vector3 vPrime = axis*s;
 
@@ -113,9 +107,10 @@ __device__ void Vector3::rotate(const Vector3 &axis, float angle) {
             { 0.0f, 0.0f, 0.0f, w*w + x1*x1 + y1*y1 + z1*z1 }
     };
 
-    float u[4] = { x(), y(), z(), 1 };
+    float u[4] = { x(), y(), z(), 1.0f };
+    float v[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 
-    float* v = multiplyVectorByMatrix(A, u);
+    multiplyVectorByMatrix(A, u, v);
 
     e[0] = v[0];
     e[1] = v[1];

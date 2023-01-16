@@ -52,6 +52,7 @@ RotateY::RotateY(std::shared_ptr<Hittable> p, double angle) : ptr(p) {
                 Vector3 tester(newx, y, newz);
 
                 for (int c = 0; c < 3; c++) {
+
                     min[c] = fmin(min[c], tester[c]);
                     max[c] = fmax(max[c], tester[c]);
                 }

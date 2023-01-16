@@ -3,19 +3,26 @@
 //
 
 #include <memory>
+#include <filesystem>
+#include <vector>
+#include <cstdio>
 
 #include "../image.h"
 
 
 #include "util.cuh"
+#include "world.cuh"
 #include "Camera.cuh"
 #include "Texture.cuh"
 #include "hittable/Hittable.cuh"
 #include "hittable/HittableList.cuh"
 #include "hittable/Sphere.cuh"
+#include "hittable/Rect.cuh"
 #include "material/Material.cuh"
 #include "material/Lambertian.cuh"
 #include "material/DiffuseLight.cuh"
+
+namespace fs = std::filesystem;
 
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
 void check_cuda(cudaError_t result, char const *const func, const char *const file, int const line) {
@@ -31,26 +38,56 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
 #define RND (curand_uniform(&local_rand_state))
 
 __device__ Color rayColor(const Ray& r, const Color* background, Hittable* world, int depth, curandState* localRandState) {
+    
     Ray currentRay = r;
     Color currentColor = Color(1.0f,1.0f,1.0f);
+    bool hitAnything = false, isBounced = false;
 
     for(int d = 0; d < depth; d++) {
         HitRecord rec;
-        if(!world->hit(currentRay,0.001,infinity,rec)) return currentColor;
+
+        if(!world->hit(currentRay,0.001f,FLT_MAX,rec,localRandState)) break;
+        hitAnything = true;
 
         Ray scattered;
         Color attenuation;
-        Color emitted = rec.matPtr->emitted(rec.u, rec.v, rec.p);
+        Color emitted = rec.matPtr->emitted(rec.u,rec.v,rec.p);
 
-        if(!rec.matPtr->scatter(currentRay,rec,attenuation,scattered,localRandState)) return currentColor * emitted;
+        if(!rec.matPtr->scatter(currentRay,rec,attenuation,scattered,localRandState)) {
+            if(!isBounced) {
+                return emitted;
+            }
 
-        currentColor = emitted + attenuation*currentColor;
+            return currentColor*emitted;
+        }
+
+        currentColor = emitted + attenuation * currentColor;
         currentRay = scattered;
-    
+        isBounced = true;
     }
 
-    return Color(0.0f,0.0f,0.0f);
+    if(hitAnything) {
+        return currentColor*(*background);
+    }
+
+    return *background;
     
+}
+
+__global__ void printImageData(image::ImageData* imageBuffer, int* imageBufferSize) {
+    if (threadIdx.x == 0 && blockIdx.x == 0) {
+        for(int i = 0; i < *imageBufferSize; i++) {
+            printf("begin imageData %d\n", i);
+            image::ImageData imageData = *(imageBuffer + i);
+            printf("width: %d, height: %d, cpp: %d\n", imageData.width, imageData.height, imageData.componentsPerPixel);
+            size_t dataSize = imageData.width * imageData.height * imageData.componentsPerPixel * sizeof(uint8_t);
+            for(long j = 0; j < dataSize; j++) {
+                printf("%c\t", imageData.data[j]);
+            }
+
+            printf("end imageData %d\n", i);
+        }
+    }
 }
 
 __global__ void renderInit(int maxX, int maxY, curandState* randState){
@@ -103,66 +140,31 @@ __global__ void rayTracePixel(Color* frameBuffer,
     frameBuffer[pixelIndex] = pixelColor;
 }
 
-__global__ void createWorld(Hittable** world, 
+__global__ void createWorld(world::WorldType worldType,
+                            Hittable** world, 
                             Hittable** objectList, 
                             int objectListSize,
                             Material** materialList,
                             Texture** textureList,
+                            image::ImageData* imageTextureBuffer,
                             Camera** camera,
                             Color** background, 
                             int imageWidth, 
                             int imageHeight) {
     if(threadIdx.x == 0 && blockIdx.x == 0) {
-        Texture* solidRed = new SolidColor(Color(0.7f, 0.0f, 0.0f));
-        Texture* solidGreen = new SolidColor(Color(0.0f, 0.7f, 0.0f));
-        Texture* solidBlue = new SolidColor(Color(0.0f, 0.0f, 0.7f));
-        Texture* solidGray = new SolidColor(Color(0.7f, 0.7f, 0.7f));
-        SolidColor* lightColor = new SolidColor(Color(7.0f,7.0f,7.0f));
-        *(textureList+0) = solidRed;
-        *(textureList+1) = solidGreen;
-        *(textureList+2) = solidBlue;
-        *(textureList+3) = solidGray;
-        *(textureList+4) = (Texture*)lightColor;
-
-        Material* redLambertian = new Lambertian(solidRed);
-        Material* greenLambertian = new Lambertian(solidGreen);
-        Material* blueLambertian = new Lambertian(solidBlue);
-        Material* grayLambertian = new Lambertian(solidGray);
-        Material* diffuseLight = new DiffuseLight(lightColor);
-        *(materialList+0) = redLambertian;
-        *(materialList+1) = greenLambertian;
-        *(materialList+2) = blueLambertian;
-        *(materialList+3) = grayLambertian;
-        *(materialList+4) = diffuseLight;
-
-
-        Sphere* redSphere = new Sphere(Point3(0.0f, 20.0f, 0.0f), 10.0f, redLambertian);
-        Sphere* greenSphere = new Sphere(Point3(30.0f, 20.0f, 0.0f), 10.0f, greenLambertian);
-        Sphere* blueSphere = new Sphere(Point3(60.0f, 20.0f, 0.0f), 10.0f, blueLambertian);
-        Sphere* graySphere = new Sphere(Point3(60.0f, -5000.0f, 0.0f), 5009.0f, grayLambertian);
-        Sphere* lightSphere1 = new Sphere(Point3(15.0f, 100.0f, 0.0f), 10.0f, diffuseLight);
-        Sphere* lightSphere2 = new Sphere(Point3(45.0f, 100.0f, 0.0f), 10.0f, diffuseLight);
-        *(objectList+0) = redSphere;
-        *(objectList+1) = greenSphere;
-        *(objectList+2) = blueSphere;
-        *(objectList+3) = graySphere;
-        *(objectList+4) = lightSphere1;
-        *(objectList+5) = lightSphere2;
-
-        *world = new HittableList(objectList, 4);
-
-        *background = new Color(0.1f,0.1f,0.1f);
-
-        Vector3 lookFrom(30.f,150.0f,-480.0f);
-        Vector3 lookAt(30.0f, 15.0f, 10.0f);
-        Vector3 viewUp(0.0f,1.0f,0.0f);
-
-        float distToFocus = (lookFrom-lookAt).length();
-        float aperture = 0.1f;
-        float aspectRatio = float(imageWidth)/float(imageHeight);
-
-        *camera = new Camera(lookFrom,lookAt,viewUp,40.0f,aspectRatio,aperture,distToFocus,0.0f,1.0f);
+        world::create(worldType,
+                      world,
+                      objectList,
+                      objectListSize,
+                      materialList,
+                      textureList,
+                      imageTextureBuffer,
+                      camera,
+                      background,
+                      imageWidth,
+                      imageHeight);
     } 
+    
 }
 
 __global__ void destroyWorld(Hittable** world, 
@@ -172,14 +174,17 @@ __global__ void destroyWorld(Hittable** world,
                             int materialListSize,
                             Texture** textureList,
                             int textureListSize,
+                            image::ImageData* imageTextureBuffer,
+                            int* imageTextureBufferSize,
                             Camera** camera, 
                             Color** background) {
 
     if(threadIdx.x == 0 && blockIdx.x == 0) { 
+
         delete *world;
         delete *camera;
         delete *background;
-    
+
         int i;
 
         for(i = 0; i < objectListSize; i++) {
@@ -193,6 +198,7 @@ __global__ void destroyWorld(Hittable** world,
         for(i = 0; i < textureListSize; i++) {
             delete textureList[i];
         }
+
     }
 
 }
@@ -200,11 +206,11 @@ __global__ void destroyWorld(Hittable** world,
 int main() {
     //Image properties
     const auto ASPECT_RATIO = 1.0f;
-    const int IMAGE_WIDTH =  480;
+    const int IMAGE_WIDTH =  960;
     const int IMAGE_HEIGHT = static_cast<int>(IMAGE_WIDTH / ASPECT_RATIO);
     const int TILE_WIDTH = 16;
     const int TILE_HEIGHT = 16;
-    const int SAMPLES_PER_PIXEL = 400;
+    const int SAMPLES_PER_PIXEL = 10000;
     const int MAX_DEPTH = 50;
     const int NUM_PIXELS = IMAGE_WIDTH*IMAGE_HEIGHT;
 
@@ -215,19 +221,32 @@ int main() {
 
     for (int i = 0; i < deviceCount; ++i) {
         cudaDeviceProp prop;
+        size_t* deviceStackFrameSize = (size_t*)malloc(sizeof(size_t));
+        size_t* deviceMallocHeapSize = (size_t*)malloc(sizeof(size_t));
 
         checkCudaErrors(cudaGetDeviceProperties(&prop, i));
+        checkCudaErrors(cudaSetDevice(i));
+        checkCudaErrors(cudaDeviceGetLimit(deviceStackFrameSize, cudaLimitStackSize));
+        checkCudaErrors(cudaDeviceGetLimit(deviceMallocHeapSize, cudaLimitMallocHeapSize));
         std::cerr << "Device name: " << prop.name << std::endl;
         std::cerr << "Total Memory: " << prop.totalGlobalMem / 1024.0 / 1024.0 << "MB" << std::endl;
         std::cerr << "Max Threads per Block: " << prop.maxThreadsPerBlock << std::endl;
         std::cerr << "Compute capability: " << prop.major << "." << prop.minor << std::endl;
-    }
+        std::cerr << "Stack Frame size: " << *deviceStackFrameSize << "B" << std::endl;
+        std::cerr << "Malloc Heap size: " << *deviceMallocHeapSize << "B" << std::endl;
+
+        free(deviceStackFrameSize);
+        free(deviceMallocHeapSize);
+    }   
+
+
 
     std::cerr << std::endl;
 
     std::cerr << "Rendering a " << IMAGE_WIDTH << "x" << IMAGE_HEIGHT << " image ";
     std::cerr << "in " << TILE_WIDTH << "x" << TILE_HEIGHT << " blocks.\n" << std::endl;;
 
+    checkCudaErrors(cudaDeviceSetLimit(cudaLimitStackSize, (size_t)2048L));
 
     Color* frameBuffer;
     int frameBufferSize = NUM_PIXELS;
@@ -245,20 +264,69 @@ int main() {
     Hittable** dWorld;
     checkCudaErrors(cudaMalloc((void**)&dWorld, sizeof(Hittable*)));
 
+    image::ImageData* dImageTextureBuffer;
+    int* dImageTextureBufferSize;
+    //loadImageDataBufferToDevice(dImageTextureBuffer, dImageTextureBufferSize);
+    char* assetsDirectory = "assets";
+
+    std::vector<image::ImageData> imageBuffer;
+
+    for(const auto& entry : fs::directory_iterator(assetsDirectory)) {
+        image::ImageData assetImageData;
+        image::readImage(entry.path().string().c_str(), assetImageData);
+        imageBuffer.push_back(assetImageData);
+    }
+
+    int assetsAmount = imageBuffer.size();
+
+    checkCudaErrors(cudaMallocManaged((void**)&dImageTextureBuffer, assetsAmount*sizeof(image::ImageData)));
+    checkCudaErrors(cudaMallocManaged((void**)&dImageTextureBufferSize, sizeof(int)));
+
+    *dImageTextureBufferSize = assetsAmount;
+
+   /* auto currentHImage = imageBuffer[0]; 
+    auto currentDImage = dImageTextureBuffer;
+    checkCudaErrors(cudaMemcpy(&(currentDImage->width), &(currentHImage.width), sizeof(int), cudaMemcpyDefault));
+    checkCudaErrors(cudaMemcpy(&(currentDImage->height), &(currentHImage.height), sizeof(int), cudaMemcpyDefault));
+    checkCudaErrors(cudaMemcpy(&(currentDImage->componentsPerPixel), &(currentHImage.componentsPerPixel), sizeof(int), cudaMemcpyDefault));
+    size_t size = currentHImage.width * currentHImage.height * currentHImage.componentsPerPixel * sizeof(uint8_t);
+    checkCudaErrors(cudaMallocManaged(&(currentDImage->data), size));
+    checkCudaErrors(cudaMemcpy(currentDImage->data, currentHImage.data, size, cudaMemcpyDefault)); */
+
+    for(int i = 0; i < assetsAmount; i++) {
+        auto currentHImage = imageBuffer[i];
+        auto currentDImage = dImageTextureBuffer + i;
+        checkCudaErrors(cudaMemcpy(&(currentDImage->width), &(currentHImage.width), sizeof(int), cudaMemcpyDefault));
+        checkCudaErrors(cudaMemcpy(&(currentDImage->height), &(currentHImage.height), sizeof(int), cudaMemcpyDefault));
+        checkCudaErrors(cudaMemcpy(&(currentDImage->componentsPerPixel), &(currentHImage.componentsPerPixel), sizeof(int), cudaMemcpyDefault));
+        size_t size = currentHImage.width * currentHImage.height * currentHImage.componentsPerPixel * sizeof(uint8_t);
+        checkCudaErrors(cudaMallocManaged(&(currentDImage->data), size));
+        checkCudaErrors(cudaMemcpy(currentDImage->data, currentHImage.data, size, cudaMemcpyDefault));
+    }
+
+    /*printImageData<<<1,1>>>(dImageTextureBuffer, dImageTextureBufferSize);
+    checkCudaErrors(cudaGetLastError());
+    checkCudaErrors(cudaDeviceSynchronize());*/
+
+    
+
+    world::WorldType worldType = world::cornellBoxWorld;
+    world::WorldInfo worldInfo = world::getWorldInfo(worldType);
+
     Hittable** dObjectList;
-    int objectListSize = 6;
+    int objectListSize = worldInfo.objectListSize;
     checkCudaErrors(cudaMalloc((void**)&dObjectList, objectListSize*sizeof(Hittable*)));
 
     Material** dMaterialList;
-    int materialListSize = 5;
+    int materialListSize = worldInfo.materialListSize;
     checkCudaErrors(cudaMalloc((void**)&dMaterialList, materialListSize*sizeof(Material*)));
 
     Texture** dTextureList;
-    int textureListSize = 5;
+    int textureListSize = worldInfo.textureListSize;
     checkCudaErrors(cudaMalloc((void**)&dTextureList, textureListSize*sizeof(Texture*)));
 
     std::cerr << "Creating world..." << std::endl;
-    createWorld<<<1,1>>>(dWorld,dObjectList,objectListSize,dMaterialList,dTextureList,dCamera,dBackground,IMAGE_WIDTH,IMAGE_HEIGHT);
+    createWorld<<<1,1>>>(worldType, dWorld,dObjectList,objectListSize,dMaterialList,dTextureList,dImageTextureBuffer,dCamera,dBackground,IMAGE_WIDTH,IMAGE_HEIGHT);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
     std::cerr << "World created!" << std::endl;
@@ -288,12 +356,17 @@ int main() {
     std::cerr << "Render took " << timerSeconds << " seconds.\n";
 
     std::cerr << "Destroying world..." << std::endl;
-    destroyWorld<<<1,1>>>(dWorld,dObjectList,objectListSize,dMaterialList,materialListSize,dTextureList,textureListSize,dCamera,dBackground);
+    destroyWorld<<<1,1>>>(dWorld,dObjectList,objectListSize,dMaterialList,materialListSize,dTextureList,textureListSize,dImageTextureBuffer,dImageTextureBufferSize,dCamera,dBackground);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
     std::cerr << "World destroyed!" << std::endl;
 
+    //destroyImageDataBuffer(dImageTextureBuffer, dImageTextureBufferSize);
+    for(int i = 0; i < *dImageTextureBufferSize; i++) {
+        checkCudaErrors(cudaFree((dImageTextureBuffer + i)->data));
+    }
 
+    checkCudaErrors(cudaFree(dImageTextureBuffer));
 
     std::shared_ptr<image::ImageData> imageData = std::make_shared<image::ImageData>();
     imageData->width = IMAGE_WIDTH;

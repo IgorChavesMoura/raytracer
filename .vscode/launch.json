@@ -5,7 +5,7 @@
             "name": "CUDA C++: Launch",
             "type": "cuda-gdb",
             "request": "launch",
-            "program": "${workspaceFolder}/build/RayTracer_GPU",
+            "program": "${workspaceFolder}/build/${workspaceFolderBasename}_GPU",
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "cmake build"

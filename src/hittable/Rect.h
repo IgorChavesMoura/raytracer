@@ -42,7 +42,7 @@ public:
     virtual bool hit(const Ray& r, double tMin, double tMax, HitRecord& rec) const override;
     virtual bool boundingBox(double t0, double t1, AABB& outputBox) const override {
 
-        // Making some thickness on bounding box z component
+        // Making some thickness on bounding box y component
         auto y0 = k - 0.0001;
         auto y1 = k + 0.0001;
 
@@ -66,7 +66,7 @@ public:
     virtual bool hit(const Ray& r, double tMin, double tMax, HitRecord& rec) const override;
     virtual bool boundingBox(double t0, double t1, AABB& outputBox) const override {
 
-        // Making some thickness on bounding box z component
+        // Making some thickness on bounding box x component
         auto x0 = k - 0.0001;
         auto x1 = k + 0.0001;
 
@@ -95,8 +95,8 @@ bool XYRect::hit(const Ray &r, double tMin, double tMax, HitRecord &rec) const {
     rec.v = (y-y0)/(y1-y0);
     rec.t = t;
 
-    auto outward_normal = Vector3(0,0,1);
-    rec.setFaceNormal(r, outward_normal);
+    auto outwardNormal = Vector3(0,0,1);
+    rec.setFaceNormal(r, outwardNormal);
     rec.matPtr = mp;
     rec.p = r.at(t);
 
@@ -117,8 +117,8 @@ bool XZRect::hit(const Ray &r, double tMin, double tMax, HitRecord &rec) const {
     rec.v = (z-z0)/(z1-z0);
     rec.t = t;
 
-    auto outward_normal = Vector3(0,1,0);
-    rec.setFaceNormal(r, outward_normal);
+    auto outwardNormal = Vector3(0,1,0);
+    rec.setFaceNormal(r, outwardNormal);
     rec.matPtr = mp;
     rec.p = r.at(t);
 
@@ -139,8 +139,8 @@ bool YZRect::hit(const Ray &r, double tMin, double tMax, HitRecord &rec) const {
     rec.v = (z-z0)/(z1-z0);
     rec.t = t;
 
-    auto outward_normal = Vector3(1,0,0);
-    rec.setFaceNormal(r, outward_normal);
+    auto outwardNormal = Vector3(1,0,0);
+    rec.setFaceNormal(r, outwardNormal);
     rec.matPtr = mp;
     rec.p = r.at(t);
 
